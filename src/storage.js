@@ -18,6 +18,11 @@ const BLOB_UPLOAD_FOLDER = 'uploads';
 const BLOB_MULTIPART_LIMIT_BYTES = 4 * 1024 * 1024;
 const DISK_MULTIPART_LIMIT_BYTES = 1024 * 1024 * 1024;
 
+// Vercel sets BLOB_STORE_ID when a Blob store is connected. BLOB_READ_WRITE_TOKEN is set on older setups.
+function blobConfigured() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
 function isUploadName(name) {
   return UPLOAD_NAME_PATTERN.test(name);
 }
@@ -145,4 +150,11 @@ function isUploadPathname(pathname) {
   return pathname.startsWith(`${BLOB_UPLOAD_FOLDER}/`) && isUploadName(pathname.slice(BLOB_UPLOAD_FOLDER.length + 1));
 }
 
-module.exports = { createDiskStorage, createBlobStorage, isUploadName, isUploadPathname, UPLOAD_NAME_PATTERN };
+module.exports = {
+  createDiskStorage,
+  createBlobStorage,
+  blobConfigured,
+  isUploadName,
+  isUploadPathname,
+  UPLOAD_NAME_PATTERN,
+};

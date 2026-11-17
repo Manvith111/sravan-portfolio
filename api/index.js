@@ -7,12 +7,12 @@
 const os = require('os');
 const path = require('path');
 const { createApp } = require('../src/app');
-const { createBlobStorage, createDiskStorage } = require('../src/storage');
+const { blobConfigured, createBlobStorage, createDiskStorage } = require('../src/storage');
 
 const ROOT = path.join(__dirname, '..');
 const TMP = os.tmpdir();
 
-const storage = process.env.BLOB_READ_WRITE_TOKEN
+const storage = blobConfigured()
   ? createBlobStorage()
   : createDiskStorage({
       dataFile: path.join(TMP, 'sravan-site.json'),

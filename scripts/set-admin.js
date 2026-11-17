@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { createStore } = require('../src/store');
-const { createBlobStorage, createDiskStorage } = require('../src/storage');
+const { blobConfigured, createBlobStorage, createDiskStorage } = require('../src/storage');
 const { hashPassword } = require('../src/auth');
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -11,7 +11,7 @@ const [username, password] = process.argv.slice(2);
 // Uses the Blob store when BLOB_READ_WRITE_TOKEN is set (for example from `vercel env pull`),
 // otherwise the local data file.
 function chooseStorage() {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return createBlobStorage();
+  if (blobConfigured()) return createBlobStorage();
   const root = path.join(__dirname, '..');
   return createDiskStorage({ dataFile: path.join(root, 'data', 'site.json'), uploadDir: path.join(root, 'uploads') });
 }
@@ -23,7 +23,7 @@ async function main() {
   const passwordHash = await hashPassword(password);
   const store = createStore(chooseStorage());
   await store.update((state) => ({ ...state, admin: { username, passwordHash } }));
-  const where = process.env.BLOB_READ_WRITE_TOKEN ? 'Vercel Blob store' : 'local data file';
+  const where = blobConfigured() ? 'Vercel Blob store' : 'local data file';
   process.stdout.write(`Admin account saved for "${username}" in the ${where}. Sign in at /admin.\n`);
 }
 
