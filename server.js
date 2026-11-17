@@ -10,7 +10,7 @@ const { app, store } = createApp({
   dataFile: path.join(ROOT, 'data', 'site.json'),
   uploadDir: path.join(ROOT, 'uploads'),
   publicDir: path.join(ROOT, 'public'),
-  adminDir: path.join(ROOT, 'admin'),
+  adminDir: path.join(ROOT, 'public', 'admin'),
 });
 
 app.listen(PORT, async () => {

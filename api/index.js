@@ -22,7 +22,7 @@ const storage = process.env.BLOB_READ_WRITE_TOKEN
 const { app } = createApp({
   storage,
   publicDir: path.join(ROOT, 'public'),
-  adminDir: path.join(ROOT, 'admin'),
+  adminDir: path.join(ROOT, 'public', 'admin'),
 });
 
 module.exports = app;

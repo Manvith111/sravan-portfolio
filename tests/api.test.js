@@ -41,7 +41,7 @@ before(async () => {
     dataFile: path.join(tempDir, 'site.json'),
     uploadDir: path.join(tempDir, 'uploads'),
     publicDir: path.join(ROOT, 'public'),
-    adminDir: path.join(ROOT, 'admin'),
+    adminDir: path.join(ROOT, 'public', 'admin'),
   });
   store = created.store;
   const passwordHash = await hashPassword(PASSWORD);
