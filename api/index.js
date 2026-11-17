@@ -19,10 +19,17 @@ const storage = blobConfigured()
       uploadDir: path.join(TMP, 'sravan-uploads'),
     });
 
+// Admin account from Vercel settings (ADMIN_USERNAME and a bcrypt ADMIN_PASSWORD_HASH), used only when none exists yet.
+const bootstrapAdmin =
+  process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD_HASH
+    ? { username: process.env.ADMIN_USERNAME, passwordHash: process.env.ADMIN_PASSWORD_HASH }
+    : null;
+
 const { app } = createApp({
   storage,
   publicDir: path.join(ROOT, 'public'),
   adminDir: path.join(ROOT, 'public', 'admin'),
+  bootstrapAdmin,
 });
 
 module.exports = app;

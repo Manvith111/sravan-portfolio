@@ -24,7 +24,8 @@ function errorHandler(error, req, res, next) {
 }
 
 // storage is optional. Without it, state and uploads are kept on disk under dataFile and uploadDir.
-function createApp({ dataFile, uploadDir, publicDir, adminDir, storage }) {
+// bootstrapAdmin ({ username, passwordHash }) creates the admin account when none exists yet.
+function createApp({ dataFile, uploadDir, publicDir, adminDir, storage, bootstrapAdmin }) {
   const backend = storage || createDiskStorage({ dataFile, uploadDir });
   const store = createStore(backend);
   const upload = createUploader(backend);
@@ -39,6 +40,9 @@ function createApp({ dataFile, uploadDir, publicDir, adminDir, storage }) {
   app.use('/api', async (req, res, next) => {
     try {
       await store.refresh();
+      if (bootstrapAdmin && !store.read().admin) {
+        await store.update((state) => (state.admin ? state : { ...state, admin: bootstrapAdmin }));
+      }
       next();
     } catch (error) {
       next(error);
