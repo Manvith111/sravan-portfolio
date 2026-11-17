@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SRAVAN · Portfolio</title>
+  <meta name="description" content="Video editing, motion graphics and AI video generation portfolio.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <div class="progress" id="scrollProgress"></div>
+
+  <header class="topbar">
+    <nav class="nav" id="nav"></nav>
+  </header>
+
+  <section class="hero" id="top">
+    <h1 class="display hero-name" id="heroName">SRAVAN</h1>
+
+    <div class="hero-photo-wrap" id="heroPhotoWrap">
+      <div class="hero-photo" id="heroPhoto" data-tilt="12"></div>
+    </div>
+
+    <div class="hero-labels" id="heroLabels"></div>
+    <p class="hero-tag tag-c" id="heroBio"></p>
+
+    <a class="scroll-cue" href="#sections">Scroll</a>
+  </section>
+
+  <main id="sections"></main>
+
+  <section class="client-feedback" id="clientFeedback" hidden>
+    <header class="section-head reveal">
+      <span class="num">Kind words</span>
+      <h2 class="display">Client feedback</h2>
+    </header>
+    <div class="testimonial-grid" id="testimonialGrid"></div>
+  </section>
+
+  <section class="contact" id="contact">
+    <form class="feedback-form" id="feedbackForm">
+      <h3 class="display">Leave feedback</h3>
+      <input name="name" placeholder="Your name" maxlength="80" autocomplete="name">
+      <input name="email" type="email" placeholder="Your email (required)" maxlength="120" autocomplete="email" required>
+      <textarea name="message" placeholder="Your message" required maxlength="2000"></textarea>
+      <button class="btn-primary" type="submit">Send message</button>
+      <p class="form-status" id="feedbackStatus" role="status"></p>
+    </form>
+    <div class="contact-list contact-details" id="contactDetails"></div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-contacts" id="footerContacts"></div>
+    <p><span id="footerName"></span> · <span id="footerYear"></span></p>
+    <p class="created-by" id="createdBy" hidden>Website created by <a id="createdByLink"></a></p>
+  </footer>
+
+  <button class="contact-fab" id="contactFab" type="button">Contact me</button>
+
+  <div class="contact-modal" id="contactModal" hidden>
+    <div class="contact-modal-card" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+      <button class="contact-modal-close" id="contactClose" type="button" aria-label="Close">×</button>
+      <h2 class="display" id="contactModalTitle">Contact me</h2>
+      <div class="contact-list" id="contactList"></div>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close">×</button>
+    <div class="lightbox-body" id="lightboxBody"></div>
+  </div>
+
+  <script type="module" src="/js/site.js"></script>
+</body>
+</html>
