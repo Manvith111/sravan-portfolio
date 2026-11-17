@@ -1,7 +1,8 @@
 import { h } from '/js/dom.js';
+import { upload as uploadToBlob } from 'https://cdn.jsdelivr.net/npm/@vercel/blob@2.8.2/dist/client.js/+esm';
 
 const app = document.getElementById('app');
-const state = { site: null, tab: 'profile', mediaCategoryId: null, experienceCategoryId: null };
+const state = { site: null, tab: 'profile', mediaCategoryId: null, experienceCategoryId: null, directUploads: false };
 
 const TABS = [
   ['profile', 'Profile & photo'],
@@ -86,7 +87,23 @@ function uploadWithProgress(path, formData, onProgress) {
 }
 
 async function loadSite() {
-  state.site = await api('/site');
+  const [site, me] = await Promise.all([api('/site'), api('/me')]);
+  state.site = site;
+  state.directUploads = me.directUploads === true;
+}
+
+// On Vercel the server stores files in a private Blob store. The browser sends each file
+// straight there, so large videos skip the server's request size limit. Resolves to the stored name.
+async function uploadDirect(file, onProgress) {
+  const dot = file.name.lastIndexOf('.');
+  const extension = dot >= 0 ? file.name.slice(dot).toLowerCase() : '';
+  const name = `${crypto.randomUUID()}${extension}`;
+  await uploadToBlob(`uploads/${name}`, file, {
+    access: 'private',
+    handleUploadUrl: '/api/admin/uploads/token',
+    onUploadProgress: (event) => onProgress(event.percentage / 100),
+  });
+  return name;
 }
 
 // Feedback helpers ------------------------------------------------------------
@@ -334,9 +351,7 @@ function profileTab() {
         event.preventDefault();
         const file = photoInput.files[0];
         if (!file) return notify('Choose a photo first', true);
-        const data = new FormData();
-        data.append('photo', file);
-        return saveWith(() => api('/profile/photo', { method: 'POST', form: data }), 'Photo updated');
+        return saveWith(() => savePhoto(file), 'Photo updated');
       },
     },
     h('h2', {}, 'Photo in the middle of the page'),
@@ -346,6 +361,16 @@ function profileTab() {
   );
 
   return h('div', { class: 'panel-stack' }, details, photoForm);
+}
+
+async function savePhoto(file) {
+  if (state.directUploads) {
+    const name = await uploadDirect(file, () => {});
+    return api('/profile/photo/uploaded', { method: 'POST', body: { file: name } });
+  }
+  const data = new FormData();
+  data.append('photo', file);
+  return api('/profile/photo', { method: 'POST', form: data });
 }
 
 // Contacts ----------------------------------------------------------------
@@ -525,10 +550,15 @@ async function uploadItem(form, categoryId) {
   progressBar.style.width = '0%';
   submit.disabled = true;
 
+  const setProgress = (ratio) => {
+    progressBar.style.width = `${Math.round(ratio * 100)}%`;
+  };
   try {
-    await uploadWithProgress('/items', data, (ratio) => {
-      progressBar.style.width = `${Math.round(ratio * 100)}%`;
-    });
+    if (state.directUploads) {
+      await uploadItemDirect(data, categoryId, setProgress);
+    } else {
+      await uploadWithProgress('/items', data, setProgress);
+    }
     notify('Uploaded');
     await loadSite();
     renderShell();
@@ -537,6 +567,25 @@ async function uploadItem(form, categoryId) {
     progressWrap.hidden = true;
     handleError(error);
   }
+}
+
+// Sends the main file and optional poster to Blob, then records the item on the server.
+async function uploadItemDirect(data, categoryId, onProgress) {
+  const main = data.get('file');
+  const fileName = await uploadDirect(main, onProgress);
+  const poster = data.get('poster');
+  const posterName = poster?.size ? await uploadDirect(poster, () => {}) : '';
+  await api('/items/uploaded', {
+    method: 'POST',
+    body: {
+      categoryId,
+      title: data.get('title') || '',
+      caption: data.get('caption') || '',
+      file: fileName,
+      poster: posterName,
+      originalName: main.name,
+    },
+  });
 }
 
 function itemRow(item, index, total) {

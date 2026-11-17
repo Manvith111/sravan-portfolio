@@ -4,7 +4,8 @@ const express = require('express');
 const path = require('path');
 const { cleanText, requireText } = require('../validation');
 const { httpError } = require('../errors');
-const { mediaTypeOf, discardUploads } = require('../uploads');
+const { mediaTypeOf } = require('../uploads');
+const { isUploadName } = require('../storage');
 const {
   newId,
   parseDirection,
@@ -16,40 +17,69 @@ const {
   findCategory,
 } = require('./helpers');
 
+// A file the browser sent straight to storage. It must be a valid upload name that exists.
+async function requireStoredUpload(storage, name, { imageOnly = false } = {}) {
+  if (!isUploadName(name)) throw httpError(400, 'Upload is not valid');
+  if (imageOnly && mediaTypeOf(name) !== 'image') throw httpError(400, 'Poster must be an image');
+  if (!(await storage.uploadExists(name))) throw httpError(400, 'Upload not found. Try again.');
+  return name;
+}
+
 // Photos, videos and experience entries. Mounted under /api/admin.
-function createAdminContentRouter({ store, upload, uploadDir }) {
+function createAdminContentRouter({ store, storage, upload }) {
   const router = express.Router();
   const mediaUpload = upload.fields([
     { name: 'file', maxCount: 1 },
     { name: 'poster', maxCount: 1 },
   ]);
 
+  // Records a media item whose files are already stored.
+  function createItem(body, { fileName, posterName, originalName }) {
+    return addRecord(store, 'items', (state, order) => {
+      const category = findCategory(state, body.categoryId, 'media');
+      return {
+        id: newId(),
+        categoryId: category.id,
+        mediaType: mediaTypeOf(fileName),
+        title: cleanText(body.title, 120) || path.parse(originalName).name,
+        caption: cleanText(body.caption, 500),
+        file: `/uploads/${fileName}`,
+        poster: posterName ? `/uploads/${posterName}` : '',
+        order,
+        createdAt: new Date().toISOString(),
+      };
+    });
+  }
+
   // Media items --------------------------------------------------------------
 
+  // Small uploads that pass through this server (local development, or under the Vercel body limit).
   router.post('/items', mediaUpload, async (req, res) => {
     const main = req.files?.file?.[0];
     const poster = req.files?.poster?.[0];
-    const uploaded = [main, poster].filter(Boolean);
+    if (!main) throw httpError(400, 'Choose a photo or video');
+    const fileName = await storage.keepUpload(main);
+    const posterName = poster ? await storage.keepUpload(poster) : '';
     try {
-      if (!main) throw httpError(400, 'Choose a photo or video');
-      const body = req.body || {};
-      const item = await addRecord(store, 'items', (state, order) => {
-        const category = findCategory(state, body.categoryId, 'media');
-        return {
-          id: newId(),
-          categoryId: category.id,
-          mediaType: mediaTypeOf(main.originalname),
-          title: cleanText(body.title, 120) || path.parse(main.originalname).name,
-          caption: cleanText(body.caption, 500),
-          file: `/uploads/${main.filename}`,
-          poster: poster ? `/uploads/${poster.filename}` : '',
-          order,
-          createdAt: new Date().toISOString(),
-        };
-      });
+      const item = await createItem(req.body || {}, { fileName, posterName, originalName: main.originalname });
       res.status(201).json(item);
     } catch (error) {
-      discardUploads(uploadDir, uploaded);
+      await removeUnusedUploads(store, storage, [`/uploads/${fileName}`, posterName && `/uploads/${posterName}`].filter(Boolean));
+      throw error;
+    }
+  });
+
+  // Large uploads: the browser has already sent the file to storage (see /uploads/token).
+  router.post('/items/uploaded', async (req, res) => {
+    const body = req.body || {};
+    const sent = [body.file, body.poster].filter(Boolean).map((name) => `/uploads/${name}`);
+    try {
+      const fileName = await requireStoredUpload(storage, body.file);
+      const posterName = body.poster ? await requireStoredUpload(storage, body.poster, { imageOnly: true }) : '';
+      const item = await createItem(body, { fileName, posterName, originalName: body.originalName || fileName });
+      res.status(201).json(item);
+    } catch (error) {
+      await removeUnusedUploads(store, storage, sent);
       throw error;
     }
   });
@@ -67,7 +97,7 @@ function createAdminContentRouter({ store, upload, uploadDir }) {
     const item = store.read().items.find((i) => i.id === req.params.id);
     if (!item) throw httpError(404, 'Not found');
     await deleteRecord(store, 'items', req.params.id);
-    await removeUnusedUploads(store, uploadDir, [item.file, item.poster]);
+    await removeUnusedUploads(store, storage, [item.file, item.poster]);
     res.json({ ok: true });
   });
 

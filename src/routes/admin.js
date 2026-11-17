@@ -13,7 +13,9 @@ const { buildAdminPayload } = require('../site');
 const { slugify, uniqueSlug } = require('../records');
 const { validateContact, validateCategory, cleanText, requireText } = require('../validation');
 const { httpError } = require('../errors');
-const { discardUploads } = require('../uploads');
+const { handleUpload } = require('@vercel/blob/client');
+const { mediaTypeOf, MAX_UPLOAD_BYTES } = require('../uploads');
+const { isUploadName, isUploadPathname } = require('../storage');
 const {
   newId,
   parseDirection,
@@ -46,7 +48,7 @@ function parsePhotoShape(value) {
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 8;
 
-function createAdminRouter({ store, upload, uploadDir }) {
+function createAdminRouter({ store, storage, upload }) {
   const router = express.Router();
   const requireAdmin = createRequireAdmin(store);
   const loginLimit = createRateLimiter({
@@ -80,7 +82,7 @@ function createAdminRouter({ store, upload, uploadDir }) {
   router.use(requireAdmin);
 
   router.get('/me', (req, res) => {
-    res.json({ username: req.adminUser });
+    res.json({ username: req.adminUser, directUploads: storage.directUploads });
   });
 
   router.get('/site', (req, res) => {
@@ -108,18 +110,59 @@ function createAdminRouter({ store, upload, uploadDir }) {
     res.json(state.profile);
   });
 
+  // Points the profile at a stored photo and removes the previous one.
+  async function usePhoto(name) {
+    const url = `/uploads/${name}`;
+    const previous = store.read().profile.photo;
+    await store.update((state) => ({ ...state, profile: { ...state.profile, photo: url } }));
+    await removeUnusedUploads(store, storage, [previous]);
+    return url;
+  }
+
+  // Small photos that pass through this server (local development, or under the Vercel body limit).
   router.post('/profile/photo', upload.single('photo'), async (req, res) => {
     if (!req.file) throw httpError(400, 'Choose a photo');
-    const url = `/uploads/${req.file.filename}`;
-    const previous = store.read().profile.photo;
+    const name = await storage.keepUpload(req.file);
     try {
-      await store.update((state) => ({ ...state, profile: { ...state.profile, photo: url } }));
+      res.json({ photo: await usePhoto(name) });
     } catch (error) {
-      discardUploads(uploadDir, [req.file]);
+      await removeUnusedUploads(store, storage, [`/uploads/${name}`]);
       throw error;
     }
-    await removeUnusedUploads(store, uploadDir, [previous]);
-    res.json({ photo: url });
+  });
+
+  // Large photos: the browser has already sent the file to storage (see /uploads/token).
+  router.post('/profile/photo/uploaded', async (req, res) => {
+    const name = req.body?.file;
+    if (!isUploadName(name) || mediaTypeOf(name) !== 'image' || !(await storage.uploadExists(name))) {
+      throw httpError(400, 'Choose a stored photo');
+    }
+    try {
+      res.json({ photo: await usePhoto(name) });
+    } catch (error) {
+      await removeUnusedUploads(store, storage, [`/uploads/${name}`]);
+      throw error;
+    }
+  });
+
+  // Browser uploads: issues a short-lived token so the file goes straight to storage.
+  router.post('/uploads/token', async (req, res) => {
+    if (!storage.directUploads) throw httpError(404, 'Direct uploads are not used on this server');
+    const result = await handleUpload({
+      request: req,
+      body: req.body,
+      onBeforeGenerateToken: async (pathname) => {
+        if (!isUploadPathname(pathname)) throw httpError(400, 'Invalid upload name');
+        return {
+          allowedContentTypes: ['image/*', 'video/*'],
+          maximumSizeInBytes: MAX_UPLOAD_BYTES,
+          addRandomSuffix: false,
+          allowOverwrite: false,
+        };
+      },
+      onUploadCompleted: async () => {},
+    });
+    res.json(result);
   });
 
   // Contacts ----------------------------------------------------------------
@@ -191,7 +234,7 @@ function createAdminRouter({ store, upload, uploadDir }) {
         experiences: state.experiences.filter((entry) => entry.categoryId !== categoryId),
       };
     });
-    await removeUnusedUploads(store, uploadDir, orphanedUploads);
+    await removeUnusedUploads(store, storage, orphanedUploads);
     res.json({ ok: true });
   });
 
@@ -214,7 +257,7 @@ function createAdminRouter({ store, upload, uploadDir }) {
     res.json({ ok: true });
   });
 
-  router.use(createAdminContentRouter({ store, upload, uploadDir }));
+  router.use(createAdminContentRouter({ store, storage, upload }));
 
   return router;
 }

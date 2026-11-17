@@ -151,7 +151,7 @@ test('uploading a photo to a media category makes it visible and serves the file
   const upload = await call('/api/admin/items', { method: 'POST', raw: form });
   assert.equal(upload.status, 201);
   assert.equal(upload.data.mediaType, 'image');
-  assert.match(upload.data.file, /^\/uploads\/[0-9a-f]+\.png$/);
+  assert.match(upload.data.file, /^\/uploads\/[0-9a-f-]+\.png$/);
 
   const served = await fetch(`${base}${upload.data.file}`);
   assert.equal(served.status, 200);

@@ -1,39 +1,41 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const { createDefaultState } = require('./defaults');
 
-// A small JSON-file store. Writes are queued so concurrent requests cannot interleave,
-// and each write goes to a temp file first so a crash cannot leave half-written JSON.
-function createStore(filePath) {
+// Holds the site state in memory and writes every change through a storage backend.
+// Writes are queued so concurrent requests cannot interleave.
+// A backend with alwaysReload set is re-read before every change, because other server instances may write too.
+function createStore(backend) {
   let state = null;
   let writeQueue = Promise.resolve();
 
-  function writeToDisk(next) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const tempPath = `${filePath}.tmp`;
-    fs.writeFileSync(tempPath, JSON.stringify(next, null, 2), 'utf8');
-    fs.renameSync(tempPath, filePath);
+  async function load() {
+    let loaded = await backend.loadState();
+    if (!loaded) {
+      loaded = createDefaultState();
+      await backend.saveState(loaded);
+    }
+    state = loaded;
+    return state;
   }
 
+  async function refresh() {
+    if (state === null || backend.alwaysReload) return load();
+    return state;
+  }
+
+  // Synchronous read. Routes call refresh() first, so state is loaded by the time they run.
   function read() {
-    if (state === null) {
-      if (fs.existsSync(filePath)) {
-        state = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      } else {
-        state = createDefaultState();
-        writeToDisk(state);
-      }
-    }
+    if (state === null) throw new Error('Store is not loaded yet');
     return state;
   }
 
   // mutate receives the current state and must return a new state object.
   function update(mutate) {
-    const run = () => {
-      const next = mutate(read());
-      writeToDisk(next);
+    const run = async () => {
+      const current = await refresh();
+      const next = mutate(current);
+      await backend.saveState(next);
       state = next;
       return next;
     };
@@ -42,7 +44,7 @@ function createStore(filePath) {
     return result;
   }
 
-  return { read, update };
+  return { load, refresh, read, update };
 }
 
 module.exports = { createStore };

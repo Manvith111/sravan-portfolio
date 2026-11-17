@@ -1,7 +1,5 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 const { httpError } = require('../errors');
 const { nextOrder, moveRecord } = require('../records');
@@ -55,12 +53,17 @@ async function moveRecordAt(store, key, id, direction, scopeOf) {
 }
 
 // Deletes uploaded files that are no longer referenced by the site.
-async function removeUnusedUploads(store, uploadDir, urls) {
+async function removeUnusedUploads(store, storage, urls) {
   const inUse = referencedUploads(store.read());
   for (const url of urls) {
     if (!url || !url.startsWith('/uploads/') || inUse.has(url)) continue;
-    await fs.promises.unlink(path.join(uploadDir, path.basename(url))).catch(() => {});
+    await storage.removeUpload(url.slice('/uploads/'.length));
   }
+}
+
+// Stored upload name from a /uploads/<name> URL, or '' when the URL is not an upload.
+function uploadNameOf(url) {
+  return url && url.startsWith('/uploads/') ? url.slice('/uploads/'.length) : '';
 }
 
 function findCategory(state, categoryId, kind) {
@@ -80,5 +83,6 @@ module.exports = {
   deleteRecord,
   moveRecordAt,
   removeUnusedUploads,
+  uploadNameOf,
   findCategory,
 };

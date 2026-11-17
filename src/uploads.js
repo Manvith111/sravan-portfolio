@@ -1,7 +1,5 @@
 'use strict';
 
-const crypto = require('crypto');
-const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { httpError } = require('./errors');
@@ -18,18 +16,11 @@ function mediaTypeOf(filename) {
 }
 
 // Only the main "file" field may carry video. Posters and photos must be images.
-function createUploader(uploadDir) {
-  const storage = multer.diskStorage({
-    destination: (req, file, callback) => callback(null, uploadDir),
-    filename: (req, file, callback) => {
-      const extension = path.extname(file.originalname).toLowerCase();
-      callback(null, `${crypto.randomBytes(16).toString('hex')}${extension}`);
-    },
-  });
-
+// The storage backend decides where the bytes go (see storage.js).
+function createUploader(storage) {
   return multer({
-    storage,
-    limits: { fileSize: MAX_UPLOAD_BYTES, files: 2 },
+    storage: storage.multerStorage(),
+    limits: { fileSize: storage.multipartLimitBytes, files: 2 },
     fileFilter: (req, file, callback) => {
       const type = mediaTypeOf(file.originalname);
       const videoAllowed = file.fieldname === 'file';
@@ -41,11 +32,4 @@ function createUploader(uploadDir) {
   });
 }
 
-// Removes files that were uploaded for a request which then failed validation.
-function discardUploads(uploadDir, files) {
-  for (const file of files) {
-    fs.promises.unlink(path.join(uploadDir, file.filename)).catch(() => {});
-  }
-}
-
-module.exports = { createUploader, discardUploads, mediaTypeOf, MAX_UPLOAD_BYTES };
+module.exports = { createUploader, mediaTypeOf, MAX_UPLOAD_BYTES };
