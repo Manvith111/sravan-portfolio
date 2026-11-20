@@ -12,6 +12,12 @@ const { blobConfigured, createBlobStorage, createDiskStorage } = require('../src
 const ROOT = path.join(__dirname, '..');
 const TMP = os.tmpdir();
 
+if (process.env.VERCEL && !blobConfigured()) {
+  console.error(
+    'BLOB_READ_WRITE_TOKEN is not set. Uploads and site data will not be saved. Add the token from the Blob store in Vercel settings.'
+  );
+}
+
 const storage = blobConfigured()
   ? createBlobStorage()
   : createDiskStorage({

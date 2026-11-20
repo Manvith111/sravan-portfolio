@@ -18,9 +18,10 @@ const BLOB_UPLOAD_FOLDER = 'uploads';
 const BLOB_MULTIPART_LIMIT_BYTES = 4 * 1024 * 1024;
 const DISK_MULTIPART_LIMIT_BYTES = 1024 * 1024 * 1024;
 
-// Vercel sets BLOB_STORE_ID when a Blob store is connected. BLOB_READ_WRITE_TOKEN is set on older setups.
+// The Blob SDK authenticates with BLOB_READ_WRITE_TOKEN only. BLOB_STORE_ID alone cannot read or write,
+// so Blob mode requires the token.
 function blobConfigured() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
 function isUploadName(name) {
