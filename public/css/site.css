@@ -279,7 +279,7 @@ p { margin: 0; }
 }
 .rail::-webkit-scrollbar { display: none; }
 .rail.dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
-.rail-card { flex: 0 0 clamp(260px, 34vw, 460px); scroll-snap-align: start; }
+.rail-card { flex: 0 0 clamp(260px, 34vw, 460px); scroll-snap-align: center; }
 .rail-btn {
   position: absolute;
   top: 42%;
