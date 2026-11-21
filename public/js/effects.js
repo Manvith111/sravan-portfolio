@@ -162,15 +162,16 @@ export function attachMotionTrack(outer) {
   const bar = outer.querySelector('.motion-bar span');
   const items = [...track.querySelectorAll('.motion-item')];
 
+  // The pinned strip is as tall as its content, so the scroll length is that height plus the sideways distance.
   const layout = () => {
     const distance = Math.max(0, track.scrollWidth - sticky.clientWidth);
-    outer.style.height = `${window.innerHeight + distance}px`;
+    outer.style.height = `${sticky.offsetHeight + distance}px`;
   };
 
   const update = () => {
     const distance = Math.max(1, track.scrollWidth - sticky.clientWidth);
     const scrolledIntoSection = -outer.getBoundingClientRect().top;
-    const span = Math.max(1, outer.offsetHeight - window.innerHeight);
+    const span = Math.max(1, outer.offsetHeight - sticky.offsetHeight);
     const progress = Math.min(1, Math.max(0, scrolledIntoSection / span));
     track.style.transform = `translate3d(${(-progress * distance).toFixed(1)}px, 0, 0)`;
 
@@ -185,6 +186,8 @@ export function attachMotionTrack(outer) {
   };
 
   window.addEventListener('resize', layout);
+  // Media sizes arrive after load, so the strip can grow; keep the scroll length in step with it.
+  new ResizeObserver(layout).observe(sticky);
   layout();
   onScrollFrame(update);
 }

@@ -213,7 +213,7 @@ p { margin: 0; }
 .reveal.in { opacity: 1; transform: none; }
 
 /* Sections */
-.section { position: relative; padding: 110px 0 60px; }
+.section { position: relative; padding: 72px 0 24px; }
 .section-head { display: grid; gap: 10px; padding: 0 6vw; margin-bottom: 44px; }
 .section-head .num { font-size: 13px; letter-spacing: 0.25em; color: var(--accent); }
 .section-head h2 { font-size: clamp(54px, 10vw, 160px); }
@@ -272,7 +272,7 @@ p { margin: 0; }
   gap: 24px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  padding: 16px 6vw 28px;
+  padding: 8px 6vw 16px;
   scrollbar-width: none;
   cursor: grab;
 }
@@ -305,12 +305,12 @@ p { margin: 0; }
 .motion-sticky {
   position: sticky;
   top: 0;
-  height: 100vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 28px;
+  justify-content: flex-start;
+  gap: 20px;
+  padding: 8px 0 0;
 }
 .motion-track {
   display: flex;
