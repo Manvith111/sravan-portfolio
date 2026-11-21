@@ -85,12 +85,20 @@ export function attachRail(wrap) {
   previous.addEventListener('click', () => rail.scrollBy({ left: -stepSize(), behavior: 'smooth' }));
   next.addEventListener('click', () => rail.scrollBy({ left: stepSize(), behavior: 'smooth' }));
 
+  // Arrows appear only on a side that has more videos to scroll to.
+  const updateArrows = () => {
+    const hasOverflow = rail.scrollWidth - rail.clientWidth > 1;
+    previous.hidden = !hasOverflow || rail.scrollLeft <= 1;
+    next.hidden = !hasOverflow || rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 1;
+  };
+
   const updateProgress = () => {
     const visible = rail.scrollWidth > 0 ? rail.clientWidth / rail.scrollWidth : 1;
     const maxScroll = rail.scrollWidth - rail.clientWidth;
     const ratio = maxScroll > 0 ? rail.scrollLeft / maxScroll : 0;
     bar.style.width = `${Math.min(100, visible * 100)}%`;
     bar.style.left = `${ratio * (1 - visible) * 100}%`;
+    updateArrows();
   };
   rail.addEventListener('scroll', updateProgress, { passive: true });
   window.addEventListener('resize', updateProgress);
