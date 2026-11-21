@@ -1,5 +1,4 @@
 import { h } from '/js/dom.js';
-import { upload as uploadToBlob } from 'https://cdn.jsdelivr.net/npm/@vercel/blob@2.8.2/dist/client.js/+esm';
 
 const app = document.getElementById('app');
 const state = { site: null, tab: 'profile', mediaCategoryId: null, experienceCategoryId: null, directUploads: false };
@@ -92,18 +91,32 @@ async function loadSite() {
   state.directUploads = me.directUploads === true;
 }
 
-// On Vercel the server stores files in a private Blob store. The browser sends each file
+// On Supabase the server issues a one-time upload address for each file, and the browser sends the file
 // straight there, so large videos skip the server's request size limit. Resolves to the stored name.
-async function uploadDirect(file, onProgress) {
-  const dot = file.name.lastIndexOf('.');
-  const extension = dot >= 0 ? file.name.slice(dot).toLowerCase() : '';
-  const name = `${crypto.randomUUID()}${extension}`;
-  await uploadToBlob(`uploads/${name}`, file, {
-    access: 'private',
-    handleUploadUrl: '/api/admin/uploads/token',
-    onUploadProgress: (event) => onProgress(event.percentage / 100),
-  });
+async function uploadDirect(file, field, onProgress) {
+  const { name, url } = await api('/uploads/start', { method: 'POST', body: { filename: file.name, field } });
+  await putWithProgress(url, file, onProgress);
   return name;
+}
+
+function putWithProgress(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    });
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      reject(new Error('Upload failed. Try again.'));
+    });
+    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+    xhr.send(file);
+  });
 }
 
 // Feedback helpers ------------------------------------------------------------
@@ -365,7 +378,7 @@ function profileTab() {
 
 async function savePhoto(file) {
   if (state.directUploads) {
-    const name = await uploadDirect(file, () => {});
+    const name = await uploadDirect(file, 'photo', () => {});
     return api('/profile/photo/uploaded', { method: 'POST', body: { file: name } });
   }
   const data = new FormData();
@@ -569,12 +582,12 @@ async function uploadItem(form, categoryId) {
   }
 }
 
-// Sends the main file and optional poster to Blob, then records the item on the server.
+// Sends the main file and optional poster to storage, then records the item on the server.
 async function uploadItemDirect(data, categoryId, onProgress) {
   const main = data.get('file');
-  const fileName = await uploadDirect(main, onProgress);
+  const fileName = await uploadDirect(main, 'file', onProgress);
   const poster = data.get('poster');
-  const posterName = poster?.size ? await uploadDirect(poster, () => {}) : '';
+  const posterName = poster?.size ? await uploadDirect(poster, 'poster', () => {}) : '';
   await api('/items/uploaded', {
     method: 'POST',
     body: {

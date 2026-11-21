@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const {
   SESSION_COOKIE,
@@ -13,9 +14,8 @@ const { buildAdminPayload } = require('../site');
 const { slugify, uniqueSlug } = require('../records');
 const { validateContact, validateCategory, cleanText, requireText } = require('../validation');
 const { httpError } = require('../errors');
-const { handleUpload } = require('@vercel/blob/client');
-const { mediaTypeOf, MAX_UPLOAD_BYTES } = require('../uploads');
-const { isUploadName, isUploadPathname } = require('../storage');
+const { mediaTypeOf } = require('../uploads');
+const { isUploadName, newUploadName } = require('../storage');
 const {
   newId,
   parseDirection,
@@ -145,24 +145,16 @@ function createAdminRouter({ store, storage, upload }) {
     }
   });
 
-  // Browser uploads: issues a short-lived token so the file goes straight to storage.
-  router.post('/uploads/token', async (req, res) => {
+  // Browser uploads: the server names the file and returns a one-time address, so the file goes straight to storage.
+  // Same rules as the server upload: only the main "file" field may carry video.
+  router.post('/uploads/start', async (req, res) => {
     if (!storage.directUploads) throw httpError(404, 'Direct uploads are not used on this server');
-    const result = await handleUpload({
-      request: req,
-      body: req.body,
-      onBeforeGenerateToken: async (pathname) => {
-        if (!isUploadPathname(pathname)) throw httpError(400, 'Invalid upload name');
-        return {
-          allowedContentTypes: ['image/*', 'video/*'],
-          maximumSizeInBytes: MAX_UPLOAD_BYTES,
-          addRandomSuffix: false,
-          allowOverwrite: false,
-        };
-      },
-      onUploadCompleted: async () => {},
-    });
-    res.json(result);
+    const filename = String(req.body?.filename ?? '');
+    const type = mediaTypeOf(filename);
+    if (!type || (type === 'video' && req.body?.field !== 'file')) throw httpError(400, 'Unsupported file type');
+    const name = newUploadName(path.extname(filename).toLowerCase());
+    const target = await storage.createDirectUpload(name);
+    res.json({ name, url: target.url });
   });
 
   // Contacts ----------------------------------------------------------------

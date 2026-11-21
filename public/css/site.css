@@ -626,11 +626,22 @@ p { margin: 0; }
 .lightbox-body { display: grid; justify-items: center; }
 .lightbox-caption { margin-top: 12px; max-width: 70ch; text-align: center; color: var(--text); }
 @media (max-width: 900px) {
-  .section { padding: 56px 0 28px; }
-  .section-head { margin-bottom: 12px; gap: 6px; }
+  .section { padding: 28px 0 8px; }
+  .section-head { margin-bottom: 10px; gap: 6px; }
   .section-head h2 { font-size: clamp(44px, 14vw, 90px); }
-  .rail { padding: 6px 6vw 14px; }
+  .rail { padding: 4px 6vw 10px; gap: 16px; }
   .rail-progress { margin-top: 0; }
+  /* The pinned motion strip becomes a plain swipeable row: no full-height box, so no empty bands */
+  .motion-outer { height: auto !important; }
+  .motion-outer .motion-sticky { position: relative; height: auto; overflow-x: auto; gap: 14px; padding: 4px 0 8px; scrollbar-width: none; }
+  .motion-outer .motion-sticky::-webkit-scrollbar { display: none; }
+  .motion-outer .motion-track { transform: none !important; gap: 16px; padding: 0 6vw; }
+  .motion-outer .motion-item { transform: none; width: 72vw; max-width: 420px; }
+  .motion-counter { padding: 0 6vw; font-size: 22px; }
+  .motion-bar { margin: 0 6vw; }
+  .rail-card { flex-basis: 72vw; }
+  .card-media img,
+  .card-media video { max-height: 62vh; }
 }
 
 /* Phones and small tablets */

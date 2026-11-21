@@ -148,9 +148,12 @@ export function attachRail(wrap) {
   );
 }
 
+// Phones and small screens: pinning a full-height box leaves large empty bands, so the strip becomes a plain swipeable row.
+const compactQuery = window.matchMedia('(max-width: 900px)');
+
 // Motion graphics: the section is pinned while the page scrolls, and the track slides sideways with it.
 export function attachMotionTrack(outer) {
-  if (reduceMotion.matches) {
+  if (reduceMotion.matches || compactQuery.matches) {
     outer.classList.add('reduced');
     return;
   }

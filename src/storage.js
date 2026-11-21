@@ -3,25 +3,25 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { Readable } = require('stream');
 const express = require('express');
 const multer = require('multer');
-const blob = require('@vercel/blob');
+const { createClient } = require('@supabase/supabase-js');
 
 // Two backends share one interface:
 // - disk: local development, files live in data/ and uploads/.
-// - blob: Vercel, state and files live in a private Vercel Blob store.
+// - supabase: production, state lives in the site_state table and files in the private "uploads" bucket.
 // Uploaded files are named with a random id and one of these extensions.
 const UPLOAD_NAME_PATTERN = /^[a-zA-Z0-9-]{8,64}\.(jpg|jpeg|png|webp|gif|mp4|webm|mov|m4v)$/;
-const BLOB_STATE_PATH = 'site/state.json';
-const BLOB_UPLOAD_FOLDER = 'uploads';
-const BLOB_MULTIPART_LIMIT_BYTES = 4 * 1024 * 1024;
+const SUPABASE_STATE_TABLE = 'site_state';
+const SUPABASE_STATE_ID = 'main';
+const SUPABASE_BUCKET = 'uploads';
+const SUPABASE_MULTIPART_LIMIT_BYTES = 4 * 1024 * 1024;
+const SIGNED_URL_SECONDS = 60 * 60;
 const DISK_MULTIPART_LIMIT_BYTES = 1024 * 1024 * 1024;
 
-// The Blob SDK authenticates with BLOB_READ_WRITE_TOKEN only. BLOB_STORE_ID alone cannot read or write,
-// so Blob mode requires the token.
-function blobConfigured() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+// Supabase needs the project URL and a secret (server-only) key. Both must be set to use the database.
+function supabaseConfigured() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
 }
 
 function isUploadName(name) {
@@ -79,83 +79,92 @@ function createDiskStorage({ dataFile, uploadDir }) {
   };
 }
 
-function createBlobStorage() {
+function createSupabaseStorage({ url, secretKey }) {
+  const client = createClient(url, secretKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const bucket = client.storage.from(SUPABASE_BUCKET);
+
+  // Throws on database errors, so a failed save never looks like success.
+  function requireNoError({ error }) {
+    if (error) throw error;
+  }
+
   return {
-    kind: 'blob',
+    kind: 'supabase',
     // Every request reloads state, because other server instances may have written it.
     alwaysReload: true,
-    multipartLimitBytes: BLOB_MULTIPART_LIMIT_BYTES,
+    multipartLimitBytes: SUPABASE_MULTIPART_LIMIT_BYTES,
     directUploads: true,
 
     async loadState() {
-      const result = await blob.get(BLOB_STATE_PATH, { access: 'private', useCache: false });
-      if (!result || result.statusCode !== 200) return null;
-      return JSON.parse(await new Response(result.stream).text());
+      const result = await client
+        .from(SUPABASE_STATE_TABLE)
+        .select('state')
+        .eq('id', SUPABASE_STATE_ID)
+        .maybeSingle();
+      requireNoError(result);
+      return result.data ? result.data.state : null;
     },
 
     async saveState(state) {
-      await blob.put(BLOB_STATE_PATH, JSON.stringify(state, null, 2), {
-        access: 'private',
-        allowOverwrite: true,
-        addRandomSuffix: false,
-        contentType: 'application/json',
-      });
+      requireNoError(
+        await client.from(SUPABASE_STATE_TABLE).upsert({
+          id: SUPABASE_STATE_ID,
+          state,
+          updated_at: new Date().toISOString(),
+        })
+      );
     },
 
-    // Files are held in memory only long enough to be sent to Blob.
+    // Files are held in memory only long enough to be sent to Storage.
     multerStorage() {
       return multer.memoryStorage();
     },
 
     async keepUpload(file) {
       const name = newUploadName(path.extname(file.originalname).toLowerCase());
-      await blob.put(`${BLOB_UPLOAD_FOLDER}/${name}`, file.buffer, {
-        access: 'private',
-        addRandomSuffix: false,
-        contentType: file.mimetype,
-      });
+      requireNoError(await bucket.upload(name, file.buffer, { contentType: file.mimetype, upsert: false }));
       return name;
     },
 
+    // Returns a one-time address the browser can PUT the file to, so large files skip this server.
+    async createDirectUpload(name) {
+      const result = await bucket.createSignedUploadUrl(name);
+      requireNoError(result);
+      return { url: result.data.signedUrl };
+    },
+
     async removeUpload(name) {
-      await blob.del(`${BLOB_UPLOAD_FOLDER}/${name}`).catch(() => {});
+      await bucket.remove([name]).catch(() => {});
     },
 
     async uploadExists(name) {
-      return blob
-        .head(`${BLOB_UPLOAD_FOLDER}/${name}`)
-        .then(() => true)
-        .catch(() => false);
+      try {
+        const result = await bucket.exists(name);
+        return result.data === true;
+      } catch {
+        return false;
+      }
     },
 
-    // Streams a private file back to the browser. Unknown names fall through to a 404.
+    // Redirects to a short-lived signed link, so video playback can seek without this server relaying bytes.
     async serveUploads(req, res, next) {
       const name = req.path.replace(/^\//, '');
       if (!isUploadName(name)) return next();
-      try {
-        const result = await blob.get(`${BLOB_UPLOAD_FOLDER}/${name}`, { access: 'private' });
-        if (!result || result.statusCode !== 200) return next();
-        res.set('Cache-Control', 'private, max-age=604800');
-        res.type(path.extname(name));
-        Readable.fromWeb(result.stream).on('error', next).pipe(res);
-        return undefined;
-      } catch (error) {
-        return next(error);
-      }
+      const result = await bucket.createSignedUrl(name, SIGNED_URL_SECONDS);
+      if (result.error || !result.data) return next();
+      res.set('Cache-Control', `private, max-age=${SIGNED_URL_SECONDS - 60}`);
+      return res.redirect(302, result.data.signedUrl);
     },
   };
 }
 
-// Blob pathname the browser must use for a direct upload.
-function isUploadPathname(pathname) {
-  return pathname.startsWith(`${BLOB_UPLOAD_FOLDER}/`) && isUploadName(pathname.slice(BLOB_UPLOAD_FOLDER.length + 1));
-}
-
 module.exports = {
   createDiskStorage,
-  createBlobStorage,
-  blobConfigured,
+  createSupabaseStorage,
+  supabaseConfigured,
   isUploadName,
-  isUploadPathname,
+  newUploadName,
   UPLOAD_NAME_PATTERN,
 };

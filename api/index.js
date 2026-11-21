@@ -1,25 +1,26 @@
 'use strict';
 
 // Vercel entry point. Vercel needs the default export to be the Express app itself.
-// With a Blob store connected (BLOB_READ_WRITE_TOKEN is set by Vercel), state and files live in Blob.
-// Without one, data is kept in the temp folder, which Vercel clears on restart.
+// With Supabase configured (SUPABASE_URL and SUPABASE_SECRET_KEY are set in Vercel), state lives in the
+// site_state table and files in the private uploads bucket.
+// Without them, data is kept in the temp folder, which Vercel clears on restart.
 
 const os = require('os');
 const path = require('path');
 const { createApp } = require('../src/app');
-const { blobConfigured, createBlobStorage, createDiskStorage } = require('../src/storage');
+const { supabaseConfigured, createSupabaseStorage, createDiskStorage } = require('../src/storage');
 
 const ROOT = path.join(__dirname, '..');
 const TMP = os.tmpdir();
 
-if (process.env.VERCEL && !blobConfigured()) {
+if (process.env.VERCEL && !supabaseConfigured()) {
   console.error(
-    'BLOB_READ_WRITE_TOKEN is not set. Uploads and site data will not be saved. Add the token from the Blob store in Vercel settings.'
+    'SUPABASE_URL and SUPABASE_SECRET_KEY are not set. Uploads and site data will not be saved. Add them in Vercel settings.'
   );
 }
 
-const storage = blobConfigured()
-  ? createBlobStorage()
+const storage = supabaseConfigured()
+  ? createSupabaseStorage({ url: process.env.SUPABASE_URL, secretKey: process.env.SUPABASE_SECRET_KEY })
   : createDiskStorage({
       dataFile: path.join(TMP, 'sravan-site.json'),
       uploadDir: path.join(TMP, 'sravan-uploads'),
