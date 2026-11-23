@@ -17,6 +17,7 @@ const SUPABASE_STATE_ID = 'main';
 const SUPABASE_BUCKET = 'uploads';
 const SUPABASE_MULTIPART_LIMIT_BYTES = 4 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 60 * 60;
+const SIGNED_URL_REUSE_MARGIN_SECONDS = 5 * 60;
 const DISK_MULTIPART_LIMIT_BYTES = 1024 * 1024 * 1024;
 
 // Supabase needs the project URL and a secret (server-only) key. Both must be set to use the database.
@@ -85,6 +86,20 @@ function createSupabaseStorage({ url, secretKey }) {
   });
   const bucket = client.storage.from(SUPABASE_BUCKET);
 
+  // Signed links are kept until shortly before they expire, so repeated video requests skip a Supabase round trip.
+  const signedUrls = new Map();
+  async function cachedSignedUrl(name) {
+    const cached = signedUrls.get(name);
+    if (cached && cached.expiresAt > Date.now()) return cached.url;
+    const result = await bucket.createSignedUrl(name, SIGNED_URL_SECONDS);
+    if (result.error || !result.data) return null;
+    signedUrls.set(name, {
+      url: result.data.signedUrl,
+      expiresAt: Date.now() + (SIGNED_URL_SECONDS - SIGNED_URL_REUSE_MARGIN_SECONDS) * 1000,
+    });
+    return result.data.signedUrl;
+  }
+
   // Throws on database errors, so a failed save never looks like success.
   function requireNoError({ error }) {
     if (error) throw error;
@@ -149,13 +164,14 @@ function createSupabaseStorage({ url, secretKey }) {
     },
 
     // Redirects to a short-lived signed link, so video playback can seek without this server relaying bytes.
+    // Redirects to a short-lived signed link, so video playback can seek without this server relaying bytes.
     async serveUploads(req, res, next) {
       const name = req.path.replace(/^\//, '');
       if (!isUploadName(name)) return next();
-      const result = await bucket.createSignedUrl(name, SIGNED_URL_SECONDS);
-      if (result.error || !result.data) return next();
+      const signedUrl = await cachedSignedUrl(name);
+      if (!signedUrl) return next();
       res.set('Cache-Control', `private, max-age=${SIGNED_URL_SECONDS - 60}`);
-      return res.redirect(302, result.data.signedUrl);
+      return res.redirect(302, signedUrl);
     },
   };
 }

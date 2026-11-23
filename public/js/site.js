@@ -1,4 +1,5 @@
 import { h } from './dom.js';
+import { applyHeroLayout, followViewport, normalizeLayout } from './layout.js';
 import {
   attachTilt,
   attachReveal,
@@ -21,6 +22,29 @@ const TYPE_NAMES = {
   website: 'Website',
   other: 'Link',
 };
+
+// Title font and size choices from the admin panel. Values are set as CSS variables so the stylesheet does the rest.
+const TITLE_FONT_STACKS = {
+  anton: "Anton, Impact, 'Arial Narrow', sans-serif",
+  courier: "'Courier Prime', 'Courier New', monospace",
+  inter: 'Inter, system-ui, sans-serif',
+};
+
+const TITLE_SIZE_VALUES = {
+  small: 'clamp(14px, 1.3vw, 18px)',
+  medium: 'clamp(18px, 1.9vw, 24px)',
+  large: 'clamp(24px, 3vw, 36px)',
+};
+
+const DEFAULT_GRID_COLUMNS = 3;
+// A grid card never gets narrower than this, so titles stay readable; the row count follows the screen width.
+const GRID_MIN_CARD_PX = 170;
+
+function applyTitleStyle(profile) {
+  const root = document.documentElement.style;
+  root.setProperty('--card-title-font', TITLE_FONT_STACKS[profile.titleFont] || TITLE_FONT_STACKS.anton);
+  root.setProperty('--card-title-size', TITLE_SIZE_VALUES[profile.titleSize] || TITLE_SIZE_VALUES.medium);
+}
 
 // Static icon artwork (stroke-based, 24px grid). Only these fixed strings are ever parsed as markup.
 const ICON_PATHS = {
@@ -77,6 +101,7 @@ function renderHeroLabels(profile) {
 
 function renderHero(profile) {
   document.title = `${profile.name} · ${profile.title}`;
+  applyTitleStyle(profile);
   $('heroName').textContent = profile.name;
   renderHeroLabels(profile);
   $('heroPhoto').classList.toggle('is-circle', profile.photoShape === 'circle');
@@ -89,6 +114,23 @@ function renderHero(profile) {
     ? h('img', { src: profile.photo, alt: profile.name })
     : h('span', { class: 'photo-placeholder' }, initials(profile.name));
   photo.prepend(visual);
+  renderHeroLayout(profile);
+}
+
+// Canvas layout from the admin panel. Without a saved layout the classic hero stays as it is.
+function renderHeroLayout(profile) {
+  if (!profile.layout) return;
+  const hero = document.querySelector('.hero');
+  hero.classList.add('lp-canvas');
+  $('heroPhoto').classList.add('lp-frame');
+  const nodes = { name: $('heroName'), photo: $('heroPhotoWrap'), labels: $('heroLabels'), bio: $('heroBio') };
+  for (const box of normalizeLayout(profile.layout).boxes) {
+    const node = h('p', { dataset: { el: box.id } }, box.text);
+    hero.append(node);
+    nodes[box.id] = node;
+  }
+  applyHeroLayout(nodes, profile.layout);
+  followViewport(hero);
 }
 
 function renderNav(categories) {
@@ -104,8 +146,9 @@ function renderMedia(item) {
   if (item.mediaType === 'video') {
     const video = h('video', {
       src: item.file,
-      poster: item.poster || undefined,
-      preload: 'metadata',
+      // Nothing loads until the card nears the screen (see attachLazyMedia). The poster is kept in a data attribute until then.
+      preload: 'none',
+      dataset: { posterSrc: item.poster || '' },
       playsinline: true,
       loop: true,
       class: 'media',
@@ -121,7 +164,11 @@ function openLightbox(item) {
     item.mediaType === 'video'
       ? h('video', { src: item.file, controls: true, autoplay: true, playsinline: true })
       : h('img', { src: item.file, alt: item.title });
-  $('lightboxBody').replaceChildren(content, item.caption ? h('p', { class: 'lightbox-caption' }, item.caption) : null);
+  $('lightboxBody').replaceChildren(
+    h('h2', { class: 'lightbox-title' }, item.title),
+    content,
+    item.caption ? h('p', { class: 'lightbox-caption' }, item.caption) : null
+  );
   $('lightbox').hidden = false;
   document.body.classList.add('no-scroll');
 }
@@ -130,6 +177,149 @@ function closeLightbox() {
   $('lightbox').hidden = true;
   $('lightboxBody').replaceChildren();
   document.body.classList.remove('no-scroll');
+}
+
+// Brand colours used by the preset modes. "auto" starts on brand and switches once the poster has been read.
+const BRAND_BOX = { background: '#ffffff', text: '#6955ff' };
+const INVERSE_BOX = { background: '#6955ff', text: '#ffffff' };
+const colourCache = new Map();
+
+// Automatic colours saved by the admin panel. Without them (older items), the colours are read from the picture on the site.
+function savedAutoColours(box) {
+  return box.autoBackground && box.autoText ? { background: box.autoBackground, text: box.autoText } : null;
+}
+
+function titleBoxColours(box) {
+  if (box.colorMode === 'inverse') return INVERSE_BOX;
+  if (box.colorMode === 'custom') return { background: box.background, text: box.text };
+  if (box.colorMode === 'auto') return savedAutoColours(box) || BRAND_BOX;
+  return BRAND_BOX;
+}
+
+// The title box under a photo or video: a rounded rectangle placed by the admin's alignment choice.
+function titleBoxElement(item) {
+  const box = item.titleBox || {};
+  const colours = titleBoxColours(box);
+  const autoFromPoster = box.colorMode === 'auto' && !savedAutoColours(box);
+  const info = h(
+    'div',
+    {
+      class: `card-info align-${box.align || 'centre'} box-${box.boxSize || 'normal'}${box.outline === false ? '' : ' has-outline'}`,
+      style: { '--box-bg': colours.background, '--box-fg': colours.text },
+      dataset: autoFromPoster ? { autoSource: item.poster || item.file, autoType: item.poster ? 'image' : item.mediaType } : {},
+    },
+    h(
+      'h3',
+      {
+        style: {
+          fontFamily: TITLE_FONT_STACKS[box.font] || TITLE_FONT_STACKS.anton,
+          fontSize: TITLE_SIZE_VALUES[box.size] || TITLE_SIZE_VALUES.medium,
+          fontWeight: box.bold ? '700' : '400',
+          fontStyle: box.italic ? 'italic' : 'normal',
+        },
+      },
+      item.title
+    )
+  );
+  return info;
+}
+
+function toHex({ r, g, b }) {
+  return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Averages the colour of a small copy of the picture, then picks dark or white text for contrast.
+function averageColour(source) {
+  const size = 24;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  context.drawImage(source, 0, 0, size, size);
+  const data = context.getImageData(0, 0, size, size).data;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  const pixels = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+  }
+  return { r: r / pixels, g: g / pixels, b: b / pixels };
+}
+
+// Pictures are fetched as data first. A picture drawn straight from another domain would block the colour reading.
+async function loadPicture(src, type) {
+  if (type === 'video') {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.preload = 'auto';
+      video.crossOrigin = 'anonymous';
+      video.addEventListener('loadeddata', () => resolve(video), { once: true });
+      video.addEventListener('error', () => reject(new Error('video unavailable')), { once: true });
+      video.src = src;
+    });
+  }
+  const response = await fetch(src);
+  if (!response.ok) throw new Error('picture unavailable');
+  return createImageBitmap(await response.blob());
+}
+
+// Returns the box colours for a picture, or null when the picture cannot be read (for example a cross-site file).
+async function sampleTitleColours(src, type) {
+  if (colourCache.has(src)) return colourCache.get(src);
+  let colours = null;
+  try {
+    const average = averageColour(await loadPicture(src, type));
+    const text = (0.299 * average.r + 0.587 * average.g + 0.114 * average.b) / 255 > 0.6 ? '#111111' : '#ffffff';
+    colours = { background: toHex(average), text };
+  } catch {
+    colours = null;
+  }
+  colourCache.set(src, colours);
+  return colours;
+}
+
+async function applyAutoTitleColours(info) {
+  const colours = await sampleTitleColours(info.dataset.autoSource, info.dataset.autoType);
+  if (!colours) return;
+  info.style.setProperty('--box-bg', colours.background);
+  info.style.setProperty('--box-fg', colours.text);
+}
+
+// Posters, video metadata and automatic colours are fetched only for cards close to the screen.
+// Each video shows its poster image; a video with no poster loads its first frame once it is near the screen.
+const LAZY_ROOT_MARGIN = '300px 0px';
+
+function loadCardMedia(card) {
+  const video = card.querySelector('video');
+  if (video) {
+    const poster = video.dataset.posterSrc;
+    if (poster && !video.poster) video.poster = poster;
+    if (!poster) video.preload = 'metadata';
+  }
+  const info = card.querySelector('.card-info[data-auto-source]');
+  if (info) applyAutoTitleColours(info);
+}
+
+function attachLazyMedia(root) {
+  const cards = [...root.querySelectorAll('.card')];
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(loadCardMedia);
+    return;
+  }
+  const observer = new IntersectionObserver(
+    (entries) =>
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        loadCardMedia(entry.target);
+        observer.unobserve(entry.target);
+      }),
+    { rootMargin: LAZY_ROOT_MARGIN }
+  );
+  cards.forEach((card) => observer.observe(card));
 }
 
 function renderCard(item, extraClass) {
@@ -145,7 +335,7 @@ function renderCard(item, extraClass) {
       dataset: { tilt: '9' },
     },
     h('div', { class: 'card-media' }, media),
-    h('div', { class: 'card-info' }, h('h3', {}, item.title))
+    titleBoxElement(item)
   );
 
   card.addEventListener('click', () => openLightbox(item));
@@ -187,12 +377,32 @@ function renderMotionTrack(items) {
   );
 }
 
-function renderGrid(items) {
+// Grid view: the admin's number is the most videos allowed in a row. The real number follows the screen width.
+function renderGrid(items, columns = DEFAULT_GRID_COLUMNS) {
+  const maxColumns = Math.max(1, Math.round(Number(columns)) || DEFAULT_GRID_COLUMNS);
   return h(
     'div',
-    { class: 'grid' },
+    { class: 'grid', dataset: { maxColumns: String(maxColumns) }, style: { '--columns': maxColumns } },
     items.map((item, index) => h('div', { class: 'reveal', style: { '--i': index % 6 } }, renderCard(item, 'grid-card')))
   );
+}
+
+// How many cards fit across the grid right now, capped at the admin's maximum. One card when only one fits.
+function fitGridColumns(grid) {
+  const style = getComputedStyle(grid);
+  const inner = grid.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const gap = parseFloat(style.columnGap) || 0;
+  const fits = Math.floor((inner + gap) / (GRID_MIN_CARD_PX + gap));
+  const maxColumns = Number(grid.dataset.maxColumns) || DEFAULT_GRID_COLUMNS;
+  grid.style.setProperty('--columns', String(Math.max(1, Math.min(maxColumns, fits))));
+}
+
+function attachGridFit() {
+  const grids = [...document.querySelectorAll('.grid')];
+  grids.forEach(fitGridColumns);
+  if (!('ResizeObserver' in window)) return;
+  const observer = new ResizeObserver((entries) => entries.forEach((entry) => fitGridColumns(entry.target)));
+  grids.forEach((grid) => observer.observe(grid));
 }
 
 function renderTimeline(entries) {
@@ -232,7 +442,7 @@ function renderSectionBody(category) {
     case 'depth-3d':
       return renderRail(items, { depth: true });
     case 'grid':
-      return renderGrid(items);
+      return renderGrid(items, category.columns);
     default:
       return renderRail(items);
   }
@@ -408,6 +618,8 @@ function activateEffects() {
   document.querySelectorAll('.depth-rail').forEach(attachDepthRail);
   attachParallax($('heroPhotoWrap'));
   attachScrollProgress(document.getElementById('scrollProgress'));
+  attachGridFit();
+  attachLazyMedia(document);
 }
 
 async function init() {

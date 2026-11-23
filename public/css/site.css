@@ -261,9 +261,46 @@ p { margin: 0; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.card-info { padding: 10px 14px 12px; }
-.card-info h3 { font-size: 16px; font-weight: 600; line-height: 1.3; }
-.card-info p { color: var(--muted); font-size: 14px; }
+/* Video fills the card as its background; the title sits in a white box at the bottom, centred, in brand violet text */
+.card-media video {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  max-height: none;
+  object-fit: cover;
+}
+/* Title box: a rounded rectangle over the bottom of the video. Colours and alignment are set per item in the admin panel */
+.card-info {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 28px);
+  padding: 8px 18px;
+  border-radius: 4px;
+  background: var(--box-bg, #ffffff);
+  color: var(--box-fg, #6955ff);
+  text-align: center;
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+/* Outline uses the text colour, so it follows automatic and custom colours too */
+.card-info.has-outline { border: 2px solid var(--box-fg, #6955ff); }
+/* Box size changes only the box's padding; the text size is its own setting */
+.card-info.box-compact { padding: 4px 10px; }
+.card-info.box-large { padding: 12px 26px; }
+.card-info.align-left { left: 14px; transform: none; text-align: left; }
+.card-info.align-right { left: auto; right: 14px; transform: none; text-align: right; }
+.card-info h3 {
+  font-family: var(--card-title-font, Anton, Impact, sans-serif);
+  font-size: var(--card-title-size, 24px);
+  font-weight: 400;
+  line-height: 1.2;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Horizontal rail (video editing and any default category) */
 .rail-wrap { position: relative; }
@@ -349,8 +386,12 @@ p { margin: 0; }
 }
 .depth-item .card-media { aspect-ratio: 16 / 9; }
 
-/* Grid (fallback effect) */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; padding: 0 6vw; }
+/* Grid view (YouTube style): the admin sets how many videos sit in each row */
+.grid { display: grid; grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr)); gap: 24px; padding: 0 6vw; }
+.grid-card .card-media video { aspect-ratio: 16 / 9; height: auto; max-height: none; object-fit: cover; }
+/* A single card (on a narrow screen or a one-per-row setting) stays a sensible size instead of filling the whole width */
+.grid > .reveal { min-width: 0; }
+.grid > .reveal > .card { width: 100%; max-width: 760px; margin: 0 auto; }
 
 /* Experience timeline */
 .timeline { list-style: none; position: relative; max-width: 1100px; margin: 0 auto; padding: 0 6vw; }
@@ -498,8 +539,9 @@ p { margin: 0; }
   animation: fade 0.3s var(--ease);
 }
 .lightbox[hidden] { display: none; }
-.lightbox-body img,
-.lightbox-body video { max-width: 90vw; max-height: 86vh; border-radius: 14px; }
+.lightbox-body img { max-width: 90vw; max-height: 86vh; border-radius: 14px; }
+/* Leave room under the video for the title above and the caption below, so the caption stays on screen while playing */
+.lightbox-body video { max-width: 90vw; max-height: max(200px, calc(100vh - 230px)); border-radius: 14px; }
 .lightbox-close {
   position: absolute;
   top: 18px;
@@ -625,7 +667,28 @@ p { margin: 0; }
 /* Tighter spacing between each category heading and its media */
 .section-head { margin-bottom: 22px; }
 .lightbox-body { display: grid; justify-items: center; }
-.lightbox-caption { margin-top: 12px; max-width: 70ch; text-align: center; color: var(--text); }
+/* Caption uses the same typewriter face and weight as the title above it */
+.lightbox-caption {
+  margin-top: 12px;
+  max-width: 70ch;
+  text-align: center;
+  color: var(--text);
+  font-family: 'Courier Prime', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: clamp(14px, 1.8vw, 20px);
+  line-height: 1.4;
+}
+/* Title on the open video uses the typewriter face and is centred */
+.lightbox-title {
+  font-family: 'Courier Prime', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: clamp(18px, 2.4vw, 28px);
+  line-height: 1.3;
+  text-align: center;
+  color: var(--text);
+  margin-bottom: 14px;
+  max-width: 90vw;
+}
 @media (max-width: 900px) {
   .section { padding: 28px 0 8px; }
   .section-head { margin-bottom: 10px; gap: 6px; }
@@ -643,6 +706,10 @@ p { margin: 0; }
   .rail-card { flex-basis: 72vw; }
   .card-media img,
   .card-media video { max-height: 62vh; }
+}
+/* Phones: a little less space between grid cards */
+@media (max-width: 560px) {
+  .grid { gap: 14px; padding: 0 4vw; }
 }
 
 /* Phones and small tablets */

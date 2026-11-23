@@ -2,7 +2,7 @@
 
 const express = require('express');
 const path = require('path');
-const { cleanText, requireText } = require('../validation');
+const { cleanText, requireText, parseTitleBox } = require('../validation');
 const { httpError } = require('../errors');
 const { mediaTypeOf } = require('../uploads');
 const { isUploadName } = require('../storage');
@@ -45,6 +45,8 @@ function createAdminContentRouter({ store, storage, upload }) {
         caption: cleanText(body.caption, 500),
         file: `/uploads/${fileName}`,
         poster: posterName ? `/uploads/${posterName}` : '',
+        // JSON uploads send a titleBox object; form uploads send the box fields flat.
+        titleBox: parseTitleBox(body.titleBox ?? body),
         order,
         createdAt: new Date().toISOString(),
       };
@@ -89,8 +91,29 @@ function createAdminContentRouter({ store, storage, upload }) {
     const updated = await updateRecord(store, 'items', req.params.id, (state, current) => ({
       title: cleanText(body.title, 120) || current.title,
       caption: body.caption === undefined ? current.caption : cleanText(body.caption, 500),
+      titleBox: body.titleBox === undefined ? current.titleBox : parseTitleBox(body.titleBox),
     }));
     res.json(updated);
+  });
+
+  // Replaces an item's poster with a smaller image, and removes the old file if nothing else uses it.
+  router.post('/items/:id/poster', upload.single('poster'), async (req, res) => {
+    const item = store.read().items.find((i) => i.id === req.params.id);
+    if (!item) throw httpError(404, 'Not found');
+    if (!req.file) throw httpError(400, 'Choose a poster image');
+    const name = await storage.keepUpload(req.file);
+    const url = `/uploads/${name}`;
+    try {
+      await store.update((state) => ({
+        ...state,
+        items: state.items.map((i) => (i.id === item.id ? { ...i, poster: url } : i)),
+      }));
+    } catch (error) {
+      await removeUnusedUploads(store, storage, [url]);
+      throw error;
+    }
+    await removeUnusedUploads(store, storage, item.poster ? [item.poster] : []);
+    res.json({ poster: url });
   });
 
   router.delete('/items/:id', async (req, res) => {

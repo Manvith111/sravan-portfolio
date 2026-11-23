@@ -1,0 +1,140 @@
+/* Free-placement layout for the top of the page (see public/js/layout.js).
+   The visitor page and the admin canvas both use these rules, so the editor preview matches the live site.
+   Positions and sizes are percentages of the canvas width (cqw), so everything scales with the screen. */
+
+.lp-canvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  aspect-ratio: 16 / 9;
+  container-type: inline-size;
+  overflow: hidden;
+  background: var(--bg, #0b0b0c);
+  text-align: left;
+}
+
+/* Every element is placed on the canvas at its own x, y and width. */
+.lp-canvas > .lp-el {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  right: auto;
+  bottom: auto;
+  width: var(--w);
+  margin: 0;
+  transform: none;
+  box-sizing: border-box;
+  z-index: 3;
+}
+.lp-canvas > .lp-name { z-index: 1; }
+.lp-canvas > .lp-photo { z-index: 2; transform: translateY(var(--py, 0px)); }
+
+/* Text elements take their look from the element's own variables. Minimum size keeps small text readable on phones. */
+.lp-canvas > .lp-text {
+  font-family: var(--lp-font);
+  font-size: max(12px, var(--lp-size));
+  font-weight: var(--lp-weight);
+  font-style: var(--lp-style);
+  text-transform: var(--lp-transform);
+  text-align: var(--lp-align);
+  color: var(--lp-color);
+  background: var(--lp-box);
+  padding: var(--lp-pad);
+  border-radius: var(--lp-radius);
+  line-height: 1.15;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: none;
+  text-shadow: none;
+}
+.lp-canvas > .lp-name { line-height: 0.9; }
+.lp-canvas > .lp-bio::before { content: none; }
+
+/* Labels are a row of items. The row follows the element's alignment. */
+.lp-canvas > .lp-labels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: var(--lp-justify);
+  gap: 6px 18px;
+}
+.lp-canvas .hero-label {
+  font: inherit;
+  color: inherit;
+  letter-spacing: 0.08em;
+  text-transform: inherit;
+  white-space: normal;
+}
+.lp-canvas .hero-label::before {
+  content: '• ';
+  color: var(--accent-2, #ffd23f);
+}
+
+/* Photo frame: fills its element, square or circle as chosen. */
+.lp-canvas .lp-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #ff6a00;
+  box-shadow: none;
+}
+.lp-canvas .lp-frame.is-circle { border-radius: 50%; }
+.lp-canvas .lp-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lp-canvas .lp-frame .photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-family: Anton, Impact, sans-serif;
+  font-size: 10cqw;
+  color: #0b0b0c;
+}
+
+/* Small screens (and the editor's phone preview): elements stack one under another, in their saved order. */
+.lp-canvas.lp-stacked {
+  aspect-ratio: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: auto;
+  padding: 96px 16px 110px;
+}
+.lp-canvas.lp-stacked > .lp-el {
+  position: static;
+  top: auto;
+  left: auto;
+  width: auto;
+}
+.lp-canvas.lp-stacked > .lp-text { width: 100%; }
+.lp-canvas.lp-stacked > .lp-photo {
+  width: max(var(--lp-m-w), 42cqw);
+  margin: 0 auto;
+}
+
+/* Hidden elements: hidden on the desktop layout, or on phones only when the admin hid them there. */
+.lp-canvas:not(.lp-stacked) > .lp-hidden { display: none; }
+.lp-canvas.lp-stacked > .lp-phone-hidden { display: none; }
+
+/* Phone text settings (font, size, colour and so on) come from the phone variables. */
+.lp-canvas.lp-stacked > .lp-text {
+  font-family: var(--lp-m-font);
+  font-size: max(12px, var(--lp-m-size));
+  font-weight: var(--lp-m-weight);
+  font-style: var(--lp-m-style);
+  text-transform: var(--lp-m-transform);
+  text-align: var(--lp-m-align);
+  color: var(--lp-m-color);
+  background: var(--lp-m-box);
+  padding: var(--lp-m-pad);
+  border-radius: var(--lp-m-radius);
+}
+.lp-canvas.lp-stacked > .lp-labels { justify-content: var(--lp-m-justify); }

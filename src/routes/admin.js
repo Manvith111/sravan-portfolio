@@ -12,7 +12,15 @@ const {
 } = require('../auth');
 const { buildAdminPayload } = require('../site');
 const { slugify, uniqueSlug } = require('../records');
-const { validateContact, validateCategory, cleanText, requireText } = require('../validation');
+const {
+  validateContact,
+  validateCategory,
+  cleanText,
+  requireText,
+  parseTitleFont,
+  parseTitleSize,
+  parseHeroLayout,
+} = require('../validation');
 const { httpError } = require('../errors');
 const { mediaTypeOf } = require('../uploads');
 const { isUploadName, newUploadName } = require('../storage');
@@ -103,8 +111,11 @@ function createAdminRouter({ store, storage, upload }) {
         bio: cleanText(body.bio, 1000),
         heroLabels: body.heroLabels === undefined ? current.profile.heroLabels : parseHeroLabels(body.heroLabels),
         photoShape: body.photoShape === undefined ? current.profile.photoShape : parsePhotoShape(body.photoShape),
+        titleFont: body.titleFont === undefined ? current.profile.titleFont : parseTitleFont(body.titleFont),
+        titleSize: body.titleSize === undefined ? current.profile.titleSize : parseTitleSize(body.titleSize),
         createdByName: body.createdByName === undefined ? current.profile.createdByName || '' : cleanText(body.createdByName, 60),
         createdByUrl: body.createdByUrl === undefined ? current.profile.createdByUrl || '' : parseOptionalUrl(body.createdByUrl),
+        layout: body.layout === undefined ? current.profile.layout ?? null : parseHeroLayout(body.layout),
       },
     }));
     res.json(state.profile);
@@ -204,6 +215,7 @@ function createAdminRouter({ store, storage, upload }) {
         effect: body.effect ?? current.effect,
         name: body.name ?? current.name,
         description: body.description ?? current.description,
+        columns: body.columns ?? current.columns,
       });
       return { ...fields, slug: uniqueSlug(slugify(fields.name), state.categories, current.id) };
     });

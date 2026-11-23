@@ -1,0 +1,93 @@
+/* Page layout canvas in the admin panel (see layout-editor.js). The canvas itself uses css/layout.css. */
+
+.le-card { gap: 14px; }
+.le-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.le-status { margin-left: auto; font-size: 12px; }
+.le-hint { font-size: 12px; margin: 0; }
+.le-hint-row { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: baseline; }
+.le-segment { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.le-segment button { border: 0; border-radius: 0; background: transparent; }
+.le-segment button[aria-pressed='true'] { background: var(--panel-2); color: var(--text); }
+
+.le-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.le-stage { display: grid; gap: 10px; min-width: 0; }
+.le-frame { width: 100%; margin: 0 auto; }
+.le-frame.is-phone { width: 390px; max-width: 100%; }
+
+/* The canvas: a faint grid helps with placement. Only the editor shows it. */
+.le-canvas {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background-color: #0b0b0c;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 10% 10%;
+  outline: none;
+  user-select: none;
+  touch-action: none;
+}
+.le-canvas:focus-visible { box-shadow: 0 0 0 2px #6955ff; }
+
+.le-el { cursor: move; outline: 1px dashed rgba(255, 255, 255, 0.22); outline-offset: 3px; }
+.le-el.is-selected { outline: 2px solid #6955ff; outline-offset: 3px; }
+.le-text[contenteditable='true'] { cursor: text; outline: 1px dashed #ffd23f; }
+.le-text:empty::before { content: attr(data-placeholder); opacity: 0.45; font-size: 0.5em; font-family: Inter, system-ui, sans-serif; letter-spacing: normal; text-transform: none; }
+.le-canvas.lp-stacked .le-el { cursor: pointer; }
+
+/* Hidden elements stay in the editor, dimmed, so they can be selected and shown again. */
+.le-canvas:not(.lp-stacked) > .lp-hidden { display: block; opacity: 0.3; }
+.le-canvas.lp-stacked > .lp-phone-hidden { display: block; opacity: 0.3; }
+
+.le-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #6955ff;
+  cursor: nwse-resize;
+  display: none;
+}
+.le-el.is-selected > .le-handle { display: block; }
+
+.le-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: #ff5a1f;
+  display: none;
+  pointer-events: none;
+  z-index: 10;
+}
+.le-guide.is-on { display: block; }
+.le-canvas.lp-stacked .le-handle,
+.le-canvas.lp-stacked .le-guide { display: none; }
+
+/* Properties panel for the selected element */
+.le-props {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0c0c0e;
+}
+.le-props-title { margin: 0; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #ffd23f; }
+.le-check { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; }
+.le-check input { width: 16px; height: 16px; accent-color: #6955ff; }
+.le-flags { display: flex; flex-wrap: wrap; gap: 14px; }
+.le-colour { display: grid; gap: 6px; }
+.le-caption { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.le-colour-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.le-colour-row input[type='color'] { width: 56px; height: 36px; padding: 2px; }
+.le-range output { color: var(--muted); font-size: 12px; margin-left: 6px; text-transform: none; }
+.le-readout { font-size: 12px; margin: 0; }
+
+@media (max-width: 900px) {
+  .le-body { grid-template-columns: 1fr; }
+}

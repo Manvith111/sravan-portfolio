@@ -103,6 +103,74 @@ button.small { padding: 6px 10px; font-size: 13px; }
 .media-row .row-form .row-actions { grid-column: 1 / -1; }
 .photo-preview { width: 180px; aspect-ratio: 1; object-fit: cover; border-radius: 50%; border: 1px solid var(--line); }
 
+/* Poster picker: a preview of the video card as visitors will see it, with a slider to choose a poster frame */
+.poster-picker { display: grid; gap: 12px; padding: 14px; border: 1px dashed var(--line); border-radius: 14px; background: #0c0c0e; }
+.poster-picker[hidden] { display: none; }
+.poster-card { position: relative; width: min(100%, 380px); border-radius: 14px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+.poster-card-media { background: #000; }
+.poster-video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
+.poster-video[hidden] { display: none; }
+.poster-card-info { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 28px); padding: 6px 16px; border-radius: 4px; background: #fff; text-align: center; }
+/* Automatic colours readout beside the colour choice */
+.auto-readout { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; align-self: end; }
+.auto-readout[hidden] { display: none; }
+.swatch { display: inline-block; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); }
+
+/* Title box panel: one tidy block with a clear order: layout, flags, colours */
+.box-panel { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #0c0c0e; }
+.box-panel-title { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-2, #ffd23f); }
+.box-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.box-grid .field, .colour-row .field { min-width: 0; }
+.box-flags { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.box-flags label { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; }
+.box-flags input[type="checkbox"] { width: 16px; height: 16px; accent-color: #6955ff; }
+.colour-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }
+.colour-row .field { min-width: 260px; flex: 1 1 260px; }
+.colour-row .auto-readout { flex: 1 1 260px; min-height: 38px; }
+.custom-colours { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.custom-colours[hidden] { display: none; }
+.custom-colours input[type="color"] { width: 100%; height: 38px; padding: 2px; border-radius: 9px; background: var(--panel-2); }
+
+/* Card preview: the card as visitors will see it */
+.preview-caption { margin-top: 4px; }
+.poster-card { width: min(100%, 420px); aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000; border: 1px solid var(--line); position: relative; }
+.poster-card-media { width: 100%; height: 100%; background: #000; }
+.poster-card-media .poster-video, .poster-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.poster-empty { display: grid; place-items: center; height: 100%; padding: 16px; text-align: center; }
+.poster-card-info { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 28px); padding: 8px 18px; border-radius: 4px; text-align: center; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6); }
+.poster-card-info.box-compact { padding: 4px 10px; }
+.poster-card-info.box-large { padding: 12px 26px; }
+.poster-card-info.align-left { left: 14px; transform: none; text-align: left; }
+.poster-card-info.align-right { left: auto; right: 14px; transform: none; text-align: right; }
+.poster-title { margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Photos & videos: each row shows the card preview on the left and the settings on the right */
+.media-row { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.item-form { display: grid; gap: 14px; min-width: 0; }
+.frame-picker { display: grid; gap: 10px; padding: 14px; border: 1px dashed var(--line); border-radius: 14px; background: #0c0c0e; }
+.frame-picker[hidden] { display: none; }
+.frame-picker .poster-video { width: 100%; max-height: 240px; object-fit: contain; background: #000; border-radius: 10px; }
+@media (max-width: 900px) {
+  .box-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .media-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .box-grid, .custom-colours { grid-template-columns: 1fr; }
+}
+/* Title box controls under each photo or video */
+.box-fields { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.box-fields input[type="color"] { width: 100%; height: 38px; padding: 2px; border-radius: 9px; background: var(--panel-2); }
+/* Fonts section */
+.font-list { display: grid; gap: 12px; }
+.font-card { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #0c0c0e; }
+.font-sample { font-size: 28px; line-height: 1.2; color: var(--text); }
+@media (max-width: 760px) { .box-fields { grid-template-columns: 1fr; } }
+.poster-title { margin: 0; line-height: 1.2; color: #6955ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poster-card-info.align-left { left: 14px; transform: none; text-align: left; }
+.poster-card-info.align-right { left: auto; right: 14px; transform: none; text-align: right; }
+.box-flags { display: flex; gap: 16px; align-items: center; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.box-flags label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
 .progress-wrap { height: 8px; border-radius: 99px; background: #0c0c0e; border: 1px solid var(--line); overflow: hidden; }
 .progress-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
 
